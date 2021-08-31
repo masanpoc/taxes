@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Compra</title>
+    <style>
+        li {
+            display: flex;
+            flex-direction: column;
+        }
+
+        ul {
+            margin-top: 5%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        body  {
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .flexy {
+            display: flex;
+            /* width: 100%; */
+            flex-direction: column;
+        }
+
+        .fit {
+            width: fit-content;
+            margin-top: 5%;
+        }
+    </style>
+</head>
+<body>
+    <form onsubmit="calculateTaxesAndTotal(event)" class="flexy">
+        <textarea rows="10" cols="50" placeholder="Escribe tu lista de productos" id="input"></textarea>
+        <input type="submit" value="Calcular" class="fit">
+    </form>
+    <ul id="results">
+
+    </ul>
+<script>
+    function separateInputIntoArray(input) {
+        let inputArray=input.split('€').map(el=>el.trim());
+        inputArray.pop();
+
+        function formatProduct(string) {
+            let price = string.split(' a ')[1].replace(/[,]/g, '.');
+            let quantity = string.split(' a ')[0].split(' ')[0];
+            let imported = false;
+            let product = string.split(' a ')[0].split(' ');
+            product.shift();
+            if(product.includes('importado') || product.includes('importados')){
+                imported=true;
+                product.pop();
+            }
+            product=product.join(' ')
+            
+            return {
+                quantity: Number(quantity), name: product, imported, price: Number(price)
+            }
+        }
+
+        let listOfProducts = inputArray.map(str=>formatProduct(str))
+        return listOfProducts;
+    }
+
+    function getTaxPercentageByProductType(product) {
+        const db_Products  = [
+            {name: 'libro', type: 'essentials'},
+            {name: 'CD de música', type: 'general'},
+            {name: 'barrita de chocolate', type: 'essentials'},
+            {name: 'caja de bombones', type: 'essentials'},
+            {name: 'frasco de perfume', type: 'general'},
+            {name: 'caja de pastillas para el dolor de cabeza', type: 'essentials'},
+        ]
+        let matchedProduct = db_Products.find(storedProd=>storedProd.name==product.name);
+        let taxPercentage = 0;
+        if(matchedProduct.type=='general'){
+            taxPercentage+=10;
+        }
+        if(product.imported){
+            taxPercentage+=5;
+        }
+        return taxPercentage;
+    }
+
+    function getProductTaxes(price, taxPercentage, quantity) {
+        
+        function roundDecimal5(num) {
+            return Math.ceil(num*100/5)*5/100
+        }
+
+        return roundDecimal5(price*(taxPercentage/100)*quantity);
+    }
+
+
+    function calculateTaxesAndTotal(event) {
+        let parent = document.getElementById('results');
+        while (parent.firstChild) {
+            parent.removeChild(parent.firstChild);
+        }
+        let inputContent = document.getElementById('input').value;
+        let list = separateInputIntoArray(inputContent);
+        let taxTotal=0;
+        let total=0;
+        let partialPrice = [];
+
+        // for each product: calculate tax & add it to tax total AND calculate (price + tax) & add it to total
+        list.forEach(
+            (product, i) => {
+                let taxToApply = getTaxPercentageByProductType(product);
+                let taxCalculated =getProductTaxes(product.price, taxToApply, product.quantity);
+                taxTotal+=taxCalculated;
+                total+=taxCalculated+product.price;
+                partialPrice[i] = (taxCalculated+product.price).toFixed(2);
+            }
+        )
+        // fix decimals to 2
+        taxTotal = taxTotal.toFixed(2);
+        total = total.toFixed(2);
+        
+        // extract input without taxes
+        let inputArray=inputContent.replace(/([0-9]+),([0-9][0-9])/g, '').split('€').map(el=>el.trim());
+        inputArray.pop();
+
+        inputArray.forEach((inputItem, i) => {
+            
+            // add initial inputItem product with taxes
+            let content_node = document.createElement("LI");                 // Create a <li> node
+            let text_content_node = document.createTextNode(`${inputItem.replace(' a', ':')} ${String(partialPrice[i]).replace('.', ',')} €`);         // Create a text node
+            content_node.appendChild(text_content_node);                              // Append the text to <li>
+            document.getElementById("results").appendChild(content_node);     // Append <li> to <ul> with id="results"
+        })
+        
+        // add total taxes
+        let taxes_node = document.createElement("LI");                                                   // Create a <li> node
+        let text_taxes_node = document.createTextNode(`Impuestos sobre las ventas: ${taxTotal != 1.50 ? taxTotal : String(taxTotal).replace('.', ',')} €`);              // Create a text node
+        taxes_node.appendChild(text_taxes_node);                                                                // Append the text to <li>
+        document.getElementById("results").appendChild(taxes_node);                                     // Append <li> to <ul> with id="results"
+        
+        // add total sum
+        let total_node = document.createElement("LI");                                                // Create a <li> node
+        let text_total_node = document.createTextNode(`Total: ${String(total).replace('.', ',')} €`);         // Create a text node
+        total_node.appendChild(text_total_node);                                                             // Append the text to <li>
+        document.getElementById("results").appendChild(total_node);                                   // Append <li> to <ul> with id="results"
+
+        event.preventDefault();
+    }
+
+</script>
+</body>
+</html>
